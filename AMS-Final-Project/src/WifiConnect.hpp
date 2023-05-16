@@ -16,7 +16,7 @@ public:
     void ConnectToWiFi();
     void WiFiConnectStatus(const char *ssid, const char *password);
     void DisconnectFromWiFi();
-    const char *ssid_ = "Emmi is nice";
-    const char *password_ = "Kaese123";
+    const char *ssid_ = "CatMagnet";
+    const char *password_ = "bingobongo!";
 };
 

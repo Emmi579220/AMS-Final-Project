@@ -9,6 +9,9 @@
 #include "Time.hpp"
 #include "NTPClient.h"
 #include <EEPROM.h>
+//
+#include <HTTPClient.h>
+
 
 // EEPROM defines
 #define EEPROM_SIZE 512
@@ -102,13 +105,15 @@ void IRAM_ATTR touchIrq()
 // }
 
 //ISR timer interrupts every 24 hours and sets the resetCoffeesFlag, then resets the timer
-hw_timer_t *resetTimer = NULL;
+
+
+//hw_timer_t *resetTimer = NULL;
 volatile bool resetCoffeesFlag = false;
 
-void IRAM_ATTR onResetTimer()
-{
-  resetCoffeesFlag = true;
-}
+//void IRAM_ATTR onResetTimer()
+//{
+ // resetCoffeesFlag = true;
+//}
 
 //setup timer interrupts
 void setupTimers()
@@ -118,10 +123,10 @@ void setupTimers()
   // timerAlarmWrite(timer, 1000000, true);
   // timerAlarmEnable(timer);
 
-  resetTimer = timerBegin(1, 80, true);
-  timerAttachInterrupt(resetTimer, &onResetTimer, true);
-  timerAlarmWrite(resetTimer, 86400000, true);
-  timerAlarmEnable(resetTimer);
+  //resetTimer = timerBegin(1, 80, true);
+  //timerAttachInterrupt(resetTimer, &onResetTimer, true);
+  //timerAlarmWrite(resetTimer, 86400000, true);
+  //timerAlarmEnable(resetTimer);
 }
 
 void setup(){
@@ -165,6 +170,47 @@ void loop(){
         ssd1963Driver.writeString(16, 14, time_str, COLOR_BLACK, &myFont, false);
         ssd1963Driver.writeChar(16+128, 14, '-', COLOR_BLACK, &myFont, false);
         ssd1963Driver.writeString(16+144, 14, date_str, COLOR_BLACK, &myFont, false);
+        // HTTP CLIENT SETUP 
+        HTTPClient http;
+        Serial.print("[HTTP] begin...\n");
+        http.begin("http://192.168.1.10"); //HTTP has to be changed since Webserver is local cause I am broke 
+        Serial.print("[HTTP] GET... \n");
+
+        // start connection and send HTTP header
+        int httpCode = http.GET();
+
+        // httpCode will be negative on error
+        if(httpCode > 0) {
+            // HTTP header has been send and Server response header has been handled
+            Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+            // file found at server
+            if(httpCode == HTTP_CODE_OK) {
+                String payload = http.getString();
+                Serial.println(payload);
+            }
+        } else {
+            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+        }
+
+      if(todaysCoffees>0){
+        // Set the target server and endpoint
+        http.begin("http://192.168.1.10/coffee");
+        // Set the content type header
+        http.addHeader("Content-Type", "text/plain");
+
+        // Send the POST request with the coffee count
+        int httpResponseCode = http.POST(String(todaysCoffees));
+        // Check the response
+        if (httpResponseCode == HTTP_CODE_OK) {
+        Serial.println("Coffee count sent successfully");
+        } else {
+        Serial.print("HTTP POST request failed with error code ");
+        Serial.println(httpResponseCode);
+        }
+      }
+
+        http.end();
     }
     else
     {
