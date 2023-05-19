@@ -11,7 +11,7 @@
 #include <EEPROM.h>
 //
 #include <HTTPClient.h>
-
+#include <WiFi.h>
 
 // EEPROM defines
 #define EEPROM_SIZE 512
@@ -43,9 +43,15 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 tmElements_t tm;
 Time myTimer(tm, timeClient);
 WifiConnect wifi;
-
+HTTPClient http;
+WiFiClient client;
 char date_str[12];
 char time_str[9];
+
+//TEMP WIFI FIX: 
+const char *ssid_ = "CatMagnet";
+const char *password_ = "bingobongo!";
+
 
 //data to store in EEPROM
 int totalCoffees;
@@ -129,6 +135,15 @@ void setupTimers()
   //timerAlarmEnable(resetTimer);
 }
 
+void setupWifi(){
+    WiFi.begin(ssid_, password_);
+    while(WiFi.status() != WL_CONNECTED) {
+      delay(1000); 
+      Serial.println("Connecting to wifi...");
+    }
+    Serial.println("Connected To Wifi");
+}
+
 void setup(){
     Serial.begin(115200);
     
@@ -156,9 +171,61 @@ void setup(){
     delay(1000);
     setupScreenInterface();
     xTaskCreate(task1, "task1", 44000, NULL, 2, &task1Handle);
-    wifi.ConnectToWiFi();
+    //wifi.ConnectToWiFi();
+    setupWifi();
     setupTimers();
 }
+
+
+
+void sendPostRequest(int coffeeAmount) {
+  bool send = false;
+  int tries = 0;
+  int id = esp_random();
+  while(!send){
+    Serial.println("[HTTP] Sending POST request...");
+    // Connect to the server
+    if (http.begin(client, "http://192.168.1.10/")) {
+      
+      // Set the content type header
+      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+      //http.addHeader("Content-Type", "text/plain");
+      // Send the POST request with the coffee amount
+      // Construct the POST request payload
+      //Id for message to avoid duplicates: 
+ 
+      String payload = "amount=" + String(coffeeAmount) + "&test=69&id="+ String(id);
+
+      // Send the POST request with the payload
+      int httpResponseCode = http.POST(payload);
+      delay(50);
+      //int httpResponseCode = http.POST("amount=" + String(coffeeAmount));
+      // Check the response
+      if (httpResponseCode == HTTP_CODE_OK) {
+        String response = http.getString();
+        Serial.println("Coffee count sent successfully");
+        Serial.print("Response: ");
+        Serial.println(response);
+        send = true;
+        resetCoffeesFlag = true;
+      } else {
+        Serial.print("HTTP POST request failed with error code ");
+        Serial.println(httpResponseCode);
+      }
+      
+      // Disconnect and free resources
+      http.end();
+    } else {
+      Serial.println("Connection to server failed!");
+    }
+    tries += 1;
+    if (tries == 10){
+      Serial.println("Connection to server failed!, Breaking connection");
+      send = true;
+    }
+  }
+}
+
 
 void loop(){
 
@@ -169,48 +236,8 @@ void loop(){
         myTimer.getDate(date_str);
         ssd1963Driver.writeString(16, 14, time_str, COLOR_BLACK, &myFont, false);
         ssd1963Driver.writeChar(16+128, 14, '-', COLOR_BLACK, &myFont, false);
-        ssd1963Driver.writeString(16+144, 14, date_str, COLOR_BLACK, &myFont, false);
-        // HTTP CLIENT SETUP 
-        HTTPClient http;
-        Serial.print("[HTTP] begin...\n");
-        http.begin("http://192.168.1.10"); //HTTP has to be changed since Webserver is local cause I am broke 
-        Serial.print("[HTTP] GET... \n");
-
-        // start connection and send HTTP header
-        int httpCode = http.GET();
-
-        // httpCode will be negative on error
-        if(httpCode > 0) {
-            // HTTP header has been send and Server response header has been handled
-            Serial.printf("[HTTP] GET... code: %d\n", httpCode);
-
-            // file found at server
-            if(httpCode == HTTP_CODE_OK) {
-                String payload = http.getString();
-                Serial.println(payload);
-            }
-        } else {
-            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        }
-
-      if(todaysCoffees>0){
-        // Set the target server and endpoint
-        http.begin("http://192.168.1.10/coffee");
-        // Set the content type header
-        http.addHeader("Content-Type", "text/plain");
-
-        // Send the POST request with the coffee count
-        int httpResponseCode = http.POST(String(todaysCoffees));
-        // Check the response
-        if (httpResponseCode == HTTP_CODE_OK) {
-        Serial.println("Coffee count sent successfully");
-        } else {
-        Serial.print("HTTP POST request failed with error code ");
-        Serial.println(httpResponseCode);
-        }
-      }
-
-        http.end();
+        ssd1963Driver.writeString(16+144, 14, date_str, COLOR_BLACK, &myFont, false);    
+        
     }
     else
     {
@@ -228,7 +255,10 @@ void loop(){
         uint16_t y;
         uint32_t z;
         touch.readRaw(x, y, z);
-        if (z > 200)
+        if(x == 9999 && y==9999 && z == 9999){
+          //Fake input
+        }
+        else if (z > 200)
         {
             Serial.println("Touch detected");
             Serial.print("x: ");
@@ -237,9 +267,10 @@ void loop(){
             Serial.print(y);
             Serial.print(" z: ");
             Serial.println(z);
-            
-            if (x > 3600 && x <= 4095 && y > 3000 && y < 3200)
+            //Coffee ++
+            if (x > 3500 && y < 1500)
             {
+                Serial.println("Coffee++");
                 int totalCoffees_ = EEPROM.read(0);
                 int todaysCoffees_ = EEPROM.read(1);
                 totalCoffees_++;
@@ -260,8 +291,10 @@ void loop(){
                 ssd1963Driver.writeString(537+122, 283-48-16, totalCoffees_Str, COLOR_BLACK, &myFont, true);
                 ssd1963Driver.writeString(538+124, 283-16, todaysCoffees_Str, COLOR_BLACK, &myFont, true);
             }
-            else if (x > 3300 && x <= 4095 && y > 3700 && y <= 4095)
+            //Coffee --
+            else if (x > 3500 &&  y >= 1500)
             {
+                Serial.println("Coffee--");
                 int totalCoffees_ = EEPROM.read(0);
                 int todaysCoffees_ = EEPROM.read(1);
                 if (totalCoffees_ > 0 && todaysCoffees_ > 0)
@@ -293,11 +326,40 @@ void loop(){
                 ssd1963Driver.writeString(538+124, 283-16, todaysCoffees_Str, COLOR_BLACK, &myFont, true);
                 ssd1963Driver.writeString(537+122, 283-48-16, totalCoffees_Str, COLOR_BLACK, &myFont, true);
             }
+            else if ((x > 0 && x <= 3500 && y >= 3000) && WiFi.status() == WL_CONNECTED)
+            {                   
+                Serial.print("POST TIME");
+                int todaysCoffees_ = EEPROM.read(1);
+                sendPostRequest(todaysCoffees_); 
+                // //HTTP CLIENT SETUP OBJECT smth
+                
+                // // HTTPClient http;
+                // Serial.print("[HTTP] begin...\n");
+                // //http.begin("http://192.168.1.10"); //HTTP has to be changed since Webserver is local cause I am broke 
+                // http.begin("http://192.168.1.10");
+                // // Set the content type header
+                // http.addHeader("Content-Type", "text/plain");
+
+                // // Send the POST request with the coffee count
+                // int httpResponseCode = http.POST("amount="+String(todaysCoffees));
+                // // Check the response
+                // if (httpResponseCode == HTTP_CODE_OK) {
+                //   String response = http.getString();
+                //   Serial.println("Coffee count sent successfully");
+                //   Serial.print("Response: ");
+                //   Serial.println(response);
+                //   resetCoffeesFlag=true;
+                // } else {
+                //   Serial.print("HTTP POST request failed with error code ");
+                //   Serial.println(httpResponseCode);
+                // }
+                // http.end();
+            }  
         }
         delay(10);
         touchFlag = false;
     }
-    if (resetCoffeesFlag)
+  if (resetCoffeesFlag)
     {
         resetCoffeesFlag = false;
         Serial.println("Resetting todays coffees");
@@ -306,6 +368,30 @@ void loop(){
         ssd1963Driver.writeChar(538+124, 283-16, '0', COLOR_BLACK, &myFont, true);
     }
     delay(10);
+
+  //if(EEPROM.read(1)>0 && WiFi.status() == WL_CONNECTED){
+        // 
+        // Serial.print("[HTTP] GET... \n");
+
+        // // start connection and send HTTP header
+        // int httpCode = http.GET();
+
+        // // httpCode will be negative on error
+        // if(httpCode > 0) {
+        //     // HTTP header has been send and Server response header has been handled
+        //     Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+        //     // file found at server
+        //     if(httpCode == HTTP_CODE_OK) {
+        //         String payload = http.getString();
+        //         Serial.println(payload);
+        //     }
+        // } else {
+        //     Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+        // }
+        // Set the target server and endpoint
+
+    //}    
 }
 
 void setupScreenInterface()
@@ -326,6 +412,7 @@ void setupScreenInterface()
   insertFrame(346, 38, 428, 220-16, COLOR_BLACK, totalCoffeesStr, true);
   insertFrame(346, 38, 428, 268-16, COLOR_BLACK, todaysCoffeesStr, true);
   insertFrame(346, 38, 428, 316-16, COLOR_BLACK, lastCoffeesStr, true);
+  insertFrame(378, 112, 0, 360, COLOR_BLACK, "UPLOAD", false);
 }
 
 void insertFrame(int length, int height, int x, int y, int color, char* centeredText, bool smallText)

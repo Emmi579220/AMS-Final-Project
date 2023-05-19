@@ -75,17 +75,25 @@ void HR2046::readRaw(uint16_t &x, uint16_t &y, uint32_t &z)
     for (int i = -1; i < 3; i++)
     {
         uint16_t raw[4];
-
         raw[0] = readRaw(CMD_POS_X);
         raw[1] = readRaw(CMD_POS_Y);
+        if(raw[0] == 0){
+            x = 9999;
+            y = 9999;
+            z = 9999;
+            delay(1);
+            powerDown();
+            return;
+        }
         raw[2] = readRaw(CMD_POS_Z1);
         raw[3] = readRaw(CMD_POS_Z2);
-
+        printf("Raw: [%d, %d, %d, %d]\n", raw[0], raw[1], raw[2], raw[3]);
         if (i >= 0)
         {
-            auto zt = (raw[2] + 4095) - raw[3];
+
             values[0][i] = raw[0];
-            values[1][i] = raw[2];
+            values[1][i] = raw[1]; //changed from 2 -> 1 maybe it uses z instead of y
+            auto zt = (raw[2] + 4095) - raw[3];
             values[2][i] = zt;
 
             // printf("Raw: [%d, %d, %d]\n", raw[0], raw[1], zt);
