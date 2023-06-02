@@ -72,67 +72,12 @@ void IRAM_ATTR touchIrq()
   }
 }
 
-//ISR timer that counts the number of seconds since the last coffee
-// hw_timer_t *timer = NULL;
-// portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-// volatile int lastCoffeeSeconds = 0;
-// volatile int lastCoffeeMinutes = 0;
-// volatile int lastCoffeeHours = 0;
-// volatile int lastCoffeeDays = 0;
-// volatile int lastCoffeeMonths = 0;
-// volatile int lastCoffeeYears = 0;
-
-// void IRAM_ATTR onTimer()
-// {
-//   portENTER_CRITICAL_ISR(&timerMux);
-//   lastCoffeeSeconds++;
-//   if (lastCoffeeSeconds == 60)
-//   {
-//     lastCoffeeSeconds = 0;
-//     lastCoffeeMinutes++;
-//     if (lastCoffeeMinutes == 60)
-//     {
-//       lastCoffeeMinutes = 0;
-//       lastCoffeeHours++;
-//       if (lastCoffeeHours == 24)
-//       {
-//         lastCoffeeHours = 0;
-//         lastCoffeeDays++;
-//         if (lastCoffeeDays == 30)
-//         {
-//           lastCoffeeDays = 0;
-//           lastCoffeeMonths++;
-//         }
-//       }
-//     }
-//   }
-//   ssd1963Driver.writeString(538+108, 283+48-16, "8", COLOR_BLACK, &myFont, true);
-//   portEXIT_CRITICAL_ISR(&timerMux);
-// }
-
-//ISR timer interrupts every 24 hours and sets the resetCoffeesFlag, then resets the timer
-
-
-//hw_timer_t *resetTimer = NULL;
 volatile bool resetCoffeesFlag = false;
 
-//void IRAM_ATTR onResetTimer()
-//{
- // resetCoffeesFlag = true;
-//}
 
-//setup timer interrupts
 void setupTimers()
 {
-  // timer = timerBegin(0, 80, true);
-  // timerAttachInterrupt(timer, &onTimer, true);
-  // timerAlarmWrite(timer, 1000000, true);
-  // timerAlarmEnable(timer);
 
-  //resetTimer = timerBegin(1, 80, true);
-  //timerAttachInterrupt(resetTimer, &onResetTimer, true);
-  //timerAlarmWrite(resetTimer, 86400000, true);
-  //timerAlarmEnable(resetTimer);
 }
 
 void setupWifi(){
@@ -331,29 +276,6 @@ void loop(){
                 Serial.print("POST TIME");
                 int todaysCoffees_ = EEPROM.read(1);
                 sendPostRequest(todaysCoffees_); 
-                // //HTTP CLIENT SETUP OBJECT smth
-                
-                // // HTTPClient http;
-                // Serial.print("[HTTP] begin...\n");
-                // //http.begin("http://192.168.1.10"); //HTTP has to be changed since Webserver is local cause I am broke 
-                // http.begin("http://192.168.1.10");
-                // // Set the content type header
-                // http.addHeader("Content-Type", "text/plain");
-
-                // // Send the POST request with the coffee count
-                // int httpResponseCode = http.POST("amount="+String(todaysCoffees));
-                // // Check the response
-                // if (httpResponseCode == HTTP_CODE_OK) {
-                //   String response = http.getString();
-                //   Serial.println("Coffee count sent successfully");
-                //   Serial.print("Response: ");
-                //   Serial.println(response);
-                //   resetCoffeesFlag=true;
-                // } else {
-                //   Serial.print("HTTP POST request failed with error code ");
-                //   Serial.println(httpResponseCode);
-                // }
-                // http.end();
             }  
         }
         delay(10);
@@ -367,31 +289,7 @@ void loop(){
         EEPROM.commit();
         ssd1963Driver.writeChar(538+124, 283-16, '0', COLOR_BLACK, &myFont, true);
     }
-    delay(10);
-
-  //if(EEPROM.read(1)>0 && WiFi.status() == WL_CONNECTED){
-        // 
-        // Serial.print("[HTTP] GET... \n");
-
-        // // start connection and send HTTP header
-        // int httpCode = http.GET();
-
-        // // httpCode will be negative on error
-        // if(httpCode > 0) {
-        //     // HTTP header has been send and Server response header has been handled
-        //     Serial.printf("[HTTP] GET... code: %d\n", httpCode);
-
-        //     // file found at server
-        //     if(httpCode == HTTP_CODE_OK) {
-        //         String payload = http.getString();
-        //         Serial.println(payload);
-        //     }
-        // } else {
-        //     Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        // }
-        // Set the target server and endpoint
-
-    //}    
+    delay(10); 
 }
 
 void setupScreenInterface()
